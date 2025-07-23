@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flashcards</title>
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- GSAP for animations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* Custom styles for the 3D effect and new color scheme */
+        body {
+            font-family: 'Inter', sans-serif;
+            perspective: 1000px; /* This creates the 3D space */
+            /* Soft gradient background from the reference image */
+            background: linear-gradient(135deg, #f0f2f7 0%, #e6e7f7 50%, #d7dcfb 100%);
+        }
+        .flashcard {
+            transform-style: preserve-3d;
+        }
+        .card-face {
+            backface-visibility: hidden; /* Hides the back of the element when it's facing away */
+            -webkit-backface-visibility: hidden;
+        }
+        .card-back {
+            transform: rotateY(180deg);
+        }
+        /* Custom button style from reference */
+        .btn-primary {
+            background-color: #8B5CF6; /* Purple */
+            color: white;
+        }
+        .btn-secondary {
+            background-color: #F1F5F9; /* Light Gray */
+            color: #4B5563; /* Dark Gray Text */
+            border: 1px solid #E5E7EB;
+        }
+        /* Styles for the animation toggle switch */
+        #animation-toggle-switch input:checked ~ .dot {
+            transform: translateX(100%);
+            background-color: #8B5CF6;
+        }
+        #animation-toggle-switch input:checked ~ .block {
+            background-color: #C4B5FD;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-md mx-auto">
+        <h1 class="text-3xl md:text-4xl font-bold text-center text-gray-800 mb-2 flex items-center justify-center">
+            <span class="inline-block p-2 bg-purple-600 rounded-md mr-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                </svg>
+            </span>
+            Question & Answers
+        </h1>
+        <p class="text-center text-gray-600 mb-4">Click to flip • Use arrow keys to navigate • Press R to reset</p>
+
+        <!-- Animation Toggle -->
+        <div class="flex justify-center mb-6">
+            <label id="animation-toggle-switch" for="animation-toggle" class="flex items-center cursor-pointer bg-white p-2 rounded-lg shadow-sm border border-gray-200">
+                <div class="relative">
+                    <input type="checkbox" id="animation-toggle" class="sr-only">
+                    <div class="block bg-gray-200 w-14 h-8 rounded-full"></div>
+                    <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform duration-300 ease-in-out"></div>
+                </div>
+                <div class="ml-3 text-gray-700 font-medium">
+                    Disable Animations
+                </div>
+            </label>
+        </div>
+
+
+        <!-- Flashcard container -->
+        <div id="flashcard-container" class="relative w-full h-64 md:h-72">
+            <!-- Cards will be dynamically added here by JS -->
+        </div>
+
+        <!-- Navigation Controls -->
+        <div class="flex items-center justify-center space-x-4 my-6">
+            <button id="prev-btn" class="px-5 py-2.5 rounded-lg shadow-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed btn-secondary">
+                ← Previous
+            </button>
+            <button id="reset-btn" class="px-5 py-2.5 rounded-lg shadow-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 btn-primary">
+                Reset
+            </button>
+            <button id="next-btn" class="px-5 py-2.5 rounded-lg shadow-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed btn-secondary">
+                Next →
+            </button>
+        </div>
+        
+        <!-- Card Counter -->
+        <div class="text-center">
+             <span id="card-counter" class="text-gray-600 font-medium bg-white/70 backdrop-blur-sm px-4 py-2 rounded-full border border-gray-200">Card 1 of 5</span>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DATA ---
+            const flashcardData = [
+                { question: "What is React?", answer: "A JavaScript library for building user interfaces." },
+                { question: "What is a component in React?", answer: "Reusable, self-contained pieces of UI." },
+                { question: "What is JSX?", answer: "A syntax extension for JavaScript, used with React to describe what the UI should look like." },
+                { question: "What is state in React?", answer: "An object that represents the parts of the app that can change." },
+                { question: "What is a hook?", answer: "Functions that let you “hook into” React state and lifecycle features from function components." }
+            ];
+
+            // --- DOM ELEMENTS ---
+            const container = document.getElementById('flashcard-container');
+            const prevBtn = document.getElementById('prev-btn');
+            const nextBtn = document.getElementById('next-btn');
+            const resetBtn = document.getElementById('reset-btn');
+            const cardCounter = document.getElementById('card-counter');
+            const animationToggle = document.getElementById('animation-toggle');
+
+            // --- STATE ---
+            let cards = [];
+            let currentIndex = 0;
+            let animationDuration = 0.6; // Default animation speed
+
+            // --- INITIALIZE CARDS ---
+            function createCards() {
+                container.innerHTML = '';
+                cards = [];
+                
+                flashcardData.forEach((data, index) => {
+                    const cardElement = document.createElement('div');
+                    cardElement.className = 'flashcard absolute w-full h-full cursor-pointer rounded-2xl shadow-lg';
+                    cardElement.innerHTML = `
+                        <div class="card-face card-front absolute w-full h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl">
+                            <span class="text-xs font-semibold text-white/70 tracking-widest mb-4">QUESTION</span>
+                            <p class="text-2xl md:text-3xl text-center text-white font-bold">${data.question}</p>
+                            <span class="absolute bottom-6 text-xs text-white/50">Click to reveal answer</span>
+                        </div>
+                        <div class="card-face card-back absolute w-full h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-indigo-600 to-purple-500 rounded-2xl">
+                            <span class="text-xs font-semibold text-white/70 tracking-widest mb-4">ANSWER</span>
+                            <p class="text-xl md:text-2xl font-semibold text-center text-white">${data.answer}</p>
+                        </div>
+                    `;
+                    container.appendChild(cardElement);
+                    cards.push(cardElement);
+
+                    cardElement.addEventListener('click', () => {
+                        gsap.to(cardElement, { rotationY: '+=180', duration: animationDuration, ease: 'back.inOut(1.7)' });
+                    });
+                });
+
+                gsap.set(cards, {
+                    xPercent: (i) => i === 0 ? 0 : 120,
+                    scale: (i) => i === 0 ? 1 : 0.8,
+                    zIndex: (i) => flashcardData.length - i,
+                    rotationY: 0,
+                });
+                
+                updateUI();
+            }
+
+            // --- UI UPDATE ---
+            function updateUI() {
+                cardCounter.textContent = `Card ${currentIndex + 1} of ${flashcardData.length}`;
+                prevBtn.disabled = currentIndex === 0;
+                nextBtn.disabled = currentIndex === cards.length - 1;
+            }
+
+            // --- CARD RESET ---
+            function resetCard(cardElement) {
+                // We check the current rotation and animate it back to the nearest 0 or 360 multiple.
+                const currentRotation = gsap.getProperty(cardElement, "rotationY");
+                const targetRotation = Math.round(currentRotation / 360) * 360;
+                gsap.to(cardElement, { rotationY: targetRotation, duration: animationDuration, ease: 'back.inOut(1.7)' });
+            }
+
+            // --- NAVIGATION ---
+            function goToCard(index) {
+                if (index < 0 || index >= cards.length) return;
+
+                const direction = index > currentIndex ? 1 : -1;
+                const currentCard = cards[currentIndex];
+                const nextCard = cards[index];
+
+                gsap.to(currentCard, {
+                    xPercent: -120 * direction,
+                    duration: animationDuration,
+                    ease: 'power2.inOut',
+                    scale: 0.8
+                });
+
+                gsap.fromTo(nextCard, 
+                    { xPercent: 120 * direction, scale: 0.8 },
+                    { xPercent: 0, scale: 1, duration: animationDuration, ease: 'power2.inOut', delay: animationDuration * 0.15 }
+                );
+                
+                resetCard(currentCard);
+                currentIndex = index;
+                updateUI();
+            }
+
+            // --- EVENT LISTENERS ---
+            prevBtn.addEventListener('click', () => goToCard(currentIndex - 1));
+            nextBtn.addEventListener('click', () => goToCard(currentIndex + 1));
+            resetBtn.addEventListener('click', () => resetCard(cards[currentIndex]));
+
+            // Animation toggle listener
+            animationToggle.addEventListener('change', (e) => {
+                animationDuration = e.target.checked ? 0 : 0.6;
+            });
+
+            // Keyboard navigation
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowLeft') {
+                    prevBtn.click();
+                } else if (e.key === 'ArrowRight') {
+                    nextBtn.click();
+                } else if (e.key.toLowerCase() === 'r') {
+                    resetBtn.click();
+                }
+            });
+
+            // --- INITIALIZATION ---
+            createCards();
+        });
+    </script>
+</body>
+</html>
